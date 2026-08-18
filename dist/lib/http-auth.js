@@ -25,13 +25,19 @@ function joinUrl(base, suffix) {
     return base.replace(/\/+$/, '') + suffix
 }
 
-// createHttpAuthClient({ baseUrl, apiKey }) -> { post, getWithChangeDetection }
+// createHttpAuthClient({ baseUrl, apiKey, authScheme, userAgent, headers }) -> { post, getWithChangeDetection }
+// authScheme defaults to 'Bearer' (unchanged from before); userAgent/headers are
+// additive options for callers that need extra/different static headers.
 function createHttpAuthClient(opts) {
     opts = opts || {}
     const lastHash = new Map() // path -> sha256 hex of the last body seen
 
     function authHeaders() {
-        return opts.apiKey ? { Authorization: 'Bearer ' + opts.apiKey } : {}
+        return Object.assign(
+            opts.userAgent ? { 'User-Agent': opts.userAgent } : {},
+            opts.apiKey ? { Authorization: (opts.authScheme || 'Bearer') + ' ' + opts.apiKey } : {},
+            opts.headers || {},
+        )
     }
 
     async function post(path, bodyObj) {
