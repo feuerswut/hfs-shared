@@ -1,9 +1,9 @@
 # hfs-shared
 
-Shared library plugin for feuerswut's HFS (https://github.com/rejetto/hfs)
-plugins. Exposes auth gating, batched logging, IP/CIDR parsing, an HTTP
-client, admin-UI helpers, config access, and standard responses, so this
-logic lives in one place instead of being reimplemented (and re-drifting)
+Shared library plugin for HFS (https://github.com/rejetto/hfs) plugins. 
+Exposes auth gating, batched logging, IP/CIDR parsing, an HTTP client, 
+admin-UI helpers, config access, and standard responses, so this logic 
+lives in one place instead of being reimplemented (and re-drifting)
 per plugin.
 
 ## Usage
