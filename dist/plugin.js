@@ -20,7 +20,7 @@ const adminUi = require('./lib/admin-ui')
 const cfg = require('./lib/config-accessor')
 const response = require('./lib/standard-response')
 
-exports.description = "Shared library for feuerswut's HFS plugins: auth gating, batched logging, IP/CIDR parsing, an HTTP client, admin-UI helpers, config access, and standard responses."
+exports.description = "Shared library for HFS plugins: auth gating, batched logging and more."
 exports.version = 1.0
 exports.apiRequired = 13
 exports.author = "feuerswut"
