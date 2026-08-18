@@ -1,0 +1,8 @@
+{
+  "name": "hfs-shared",
+  "private": true,
+  "description": "Shared library plugin for feuerswut's HFS plugins: auth, logging, IP parsing, HTTP client, admin UI helpers.",
+  "scripts": {
+    "test": "node test/smoke.js"
+  }
+}
