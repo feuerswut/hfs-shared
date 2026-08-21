@@ -18,11 +18,14 @@ function canonicalPath(api) {
 // opts:
 //   subPath           -- where the dashboard lives under the canonical root,
 //                         e.g. '' (default, the root itself) or 'admin'
-//   allowedUsers, publicAccess -- passed straight to auth.gate()
+//   allowedUsers, publicAccess, redirectUrl, hideFromUnauthorized -- passed
+//                         straight to auth.gate()
 //   pathAlias         -- an old URL that should redirect here (or falsy for none)
 //   useCustomFrontend -- when true, storage/custom-frontend/index.html wins
 //                         over the bundled one, if present
 //   distDir           -- the plugin's own dist directory (pass __dirname)
+//   indexFile         -- the bundled entry file's name under distDir/public/
+//                         and storageDir/custom-frontend/ (default 'index.html')
 //
 // Returns true when it fully handled ctx (redirected, served, or denied) --
 // the caller should return immediately. Returns false when the request is
@@ -34,17 +37,21 @@ function servePublic(ctx, api, opts) {
     const canonical = canonicalPath(api).replace(/\/+$/, '')
     const subPath = String(opts.subPath || '').replace(/^\/+|\/+$/g, '')
     const dashboardRoot = subPath ? `${canonical}/${subPath}` : canonical
+    const indexFile = opts.indexFile || 'index.html'
 
+    // The alias covers the whole plugin namespace (any API routes included),
+    // not just the dashboard's own subPath, so it redirects into the plugin
+    // root -- not dashboardRoot, which may be a sub-route of that root.
     if (opts.pathAlias) {
         const alias = String(opts.pathAlias).replace(/\/+$/, '')
-        if (alias && alias !== dashboardRoot && (ctx.path === alias || ctx.path.startsWith(alias + '/'))) {
+        if (alias && alias !== canonical && (ctx.path === alias || ctx.path.startsWith(alias + '/'))) {
             const suffix = ctx.path.slice(alias.length)
-            response.redirect(ctx, dashboardRoot + suffix + (ctx.querystring ? '?' + ctx.querystring : ''), 307)
+            response.redirect(ctx, canonical + suffix + (ctx.querystring ? '?' + ctx.querystring : ''), 307)
             return true
         }
     }
 
-    if (ctx.path !== dashboardRoot && ctx.path !== `${dashboardRoot}/` && ctx.path !== `${dashboardRoot}/index.html`)
+    if (ctx.path !== dashboardRoot && ctx.path !== `${dashboardRoot}/` && ctx.path !== `${dashboardRoot}/${indexFile}`)
         return false
 
     if (ctx.path !== `${dashboardRoot}/`) {
@@ -52,11 +59,16 @@ function servePublic(ctx, api, opts) {
         return true
     }
 
-    const denied = auth.gate(ctx, api, { allowedUsers: opts.allowedUsers, publicAccess: opts.publicAccess })
-    if (denied) return true
+    const denied = auth.gate(ctx, api, {
+        allowedUsers: opts.allowedUsers, publicAccess: opts.publicAccess,
+        redirectUrl: opts.redirectUrl, hideFromUnauthorized: opts.hideFromUnauthorized,
+    })
+    // A silent denial means "pretend this plugin isn't here" -- nothing was
+    // written to ctx, so the caller must fall through (false), not stop.
+    if (denied) return !denied.silent
 
     if (opts.useCustomFrontend) {
-        const customFile = path.join(api.storageDir, 'custom-frontend', 'index.html')
+        const customFile = path.join(api.storageDir, 'custom-frontend', indexFile)
         try {
             if (fs.statSync(customFile).isFile()) {
                 ctx.type = 'text/html; charset=utf-8'
@@ -71,7 +83,7 @@ function servePublic(ctx, api, opts) {
     try {
         ctx.type = 'text/html; charset=utf-8'
         ctx.set('Cache-Control', 'no-cache')
-        ctx.body = fs.readFileSync(path.join(opts.distDir, 'public', 'index.html'), 'utf8')
+        ctx.body = fs.readFileSync(path.join(opts.distDir, 'public', indexFile), 'utf8')
     } catch {
         ctx.status = 404
     }

@@ -27,7 +27,7 @@ exports.apiRequired = 13
 exports.author = "feuerswut"
 exports.repo = "feuerswut/hfs-shared"
 exports.changelog = [
-    { version: 1.2, message: "Add servePublic: auth + redirects on top of HFS's own public/ serving." },
+    { version: 1.2, message: "servePublic; auth.gate gains redirectUrl." },
 ]
 
 exports.customApi = {

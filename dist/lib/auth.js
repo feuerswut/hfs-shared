@@ -18,17 +18,28 @@ function allowedUsersField(opts) {
     }
 }
 
-// gate(ctx, api, { allowedUsers, publicAccess }): null if allowed, else sends
-// a deny response and returns { denied: true, reason }.
+// gate(ctx, api, { allowedUsers, publicAccess, redirectUrl, hideFromUnauthorized }):
+// null if allowed, else { denied: true, reason } after sending a deny
+// response -- unless hideFromUnauthorized is set and the request is simply
+// unauthenticated, in which case nothing is written to ctx at all (the
+// result carries `silent: true`) so the caller can fall through as if this
+// plugin weren't there, instead of revealing its existence with a 401/403.
+// redirectUrl, if set, sends a 302 there instead of a plain 401/403 text body.
 function gate(ctx, api, opts) {
     opts = opts || {}
     const { getCurrentUsername } = api.require('./auth')
     const username = getCurrentUsername(ctx)
 
+    function deny(status, message, reason) {
+        if (opts.redirectUrl) standardResponse.redirect(ctx, opts.redirectUrl)
+        else standardResponse.text(ctx, status, message)
+        return { denied: true, reason }
+    }
+
     if (!username) {
         if (opts.publicAccess) return null
-        standardResponse.text(ctx, 401, 'Authentication required')
-        return { denied: true, reason: 'unauthenticated' }
+        if (opts.hideFromUnauthorized) return { denied: true, reason: 'hidden', silent: true }
+        return deny(401, 'Authentication required', 'unauthenticated')
     }
 
     const rows = Array.isArray(opts.allowedUsers) ? opts.allowedUsers : []
@@ -37,8 +48,9 @@ function gate(ctx, api, opts) {
         .filter(Boolean)
 
     if (allowed.length && !allowed.includes(username)) {
-        standardResponse.text(ctx, 403, 'Access denied')
-        return { denied: true, reason: 'not-allowed', username }
+        const denied = deny(403, 'Access denied', 'not-allowed')
+        denied.username = username
+        return denied
     }
 
     return null

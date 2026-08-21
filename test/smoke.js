@@ -44,6 +44,19 @@ function mockCtx() {
     const deniedRole = auth.gate(ctx, apiFor('mallory'), { allowedUsers: [{ username: 'alice', enabled: true }] })
     assert.strictEqual(deniedRole.reason, 'not-allowed')
     assert.strictEqual(ctx.status, 403)
+
+    // redirectUrl sends a 302 there instead of a plain 401/403 body
+    ctx = mockCtx()
+    auth.gate(ctx, apiFor(null), { redirectUrl: '/login' })
+    assert.strictEqual(ctx.status, 302)
+    assert.strictEqual(ctx.headers.Location, '/login')
+
+    // hideFromUnauthorized: denies without writing anything to ctx
+    ctx = mockCtx()
+    const hidden = auth.gate(ctx, apiFor(null), { hideFromUnauthorized: true })
+    assert.deepStrictEqual(hidden, { denied: true, reason: 'hidden', silent: true })
+    assert.strictEqual(ctx.status, 0)
+    assert.strictEqual(ctx.stopped, false)
 }
 
 // standard-response
@@ -136,11 +149,37 @@ function mockCtx() {
         assert.strictEqual(ctx.headers.Location, '/~/plugins/hfs-example/api/x?y=2')
     }
 
+    // pathAlias with subPath: the alias covers the whole plugin, so it
+    // redirects into the plugin root, not into the dashboard's own subPath
+    {
+        const ctx = makeCtx('/old/example/v1/health')
+        assert.strictEqual(servePublic(ctx, makeApi('alice'), { distDir, subPath: 'admin', pathAlias: '/old/example' }), true)
+        assert.strictEqual(ctx.headers.Location, '/~/plugins/hfs-example/v1/health')
+    }
+
     // a path inside the namespace but not the dashboard entry point (e.g. an
     // API route or an asset) is left for the caller / HFS to handle
     {
         const ctx = makeCtx('/~/plugins/hfs-example/api/data')
         assert.strictEqual(servePublic(ctx, makeApi('alice'), { distDir }), false)
+    }
+
+    // hideFromUnauthorized: an unauthenticated request at the root falls
+    // through untouched instead of revealing the plugin with a 401
+    {
+        const ctx = makeCtx('/~/plugins/hfs-example/')
+        assert.strictEqual(servePublic(ctx, makeApi(null), { distDir, hideFromUnauthorized: true }), false)
+        assert.strictEqual(ctx.status, 200)
+        assert.strictEqual(ctx.body, undefined)
+    }
+
+    // indexFile: a plugin can name its bundled entry file something other
+    // than index.html (e.g. a dashboard living under a subPath)
+    {
+        fs.writeFileSync(path.join(distDir, 'public', 'admin.html'), '<html>admin</html>')
+        const ctx = makeCtx('/~/plugins/hfs-example/admin/')
+        assert.strictEqual(servePublic(ctx, makeApi('alice'), { distDir, subPath: 'admin', indexFile: 'admin.html' }), true)
+        assert.strictEqual(ctx.body, '<html>admin</html>')
     }
 
     fs.rmSync(distDir, { recursive: true, force: true })
