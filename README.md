@@ -43,6 +43,22 @@ filesystem-relative `require()`, no HFS core changes needed.
   default and optional clamping.
 - **response** -- `redirect`, `passthrough`, `text`, `custom`: common ways
   to answer an HFS request.
+- **canonicalPath(api)** -- a plugin's fixed dashboard path, `/~/plugins/<id>/`
+  (the same path HFS already auto-serves that plugin's `public/` folder
+  from).
+- **servePublic(ctx, api, opts)** -- wraps that automatic `public/` serving
+  with what it can't do alone: an `auth.gate()` check, normalizing the
+  dashboard to the one trailing-slash URL (a bare path or literal
+  `/index.html` both redirect there instead of serving), an optional legacy
+  `pathAlias` redirect, and an optional `useCustomFrontend` override folder
+  (`storage/custom-frontend/index.html`). `opts`: `subPath` (default `''`,
+  the root; e.g. `'admin'` if the dashboard lives at a sub-route),
+  `allowedUsers`/`publicAccess` (passed to `auth.gate`), `pathAlias`,
+  `useCustomFrontend`, `distDir` (pass the plugin's own `__dirname`). Returns
+  `true` if it fully handled the request (the caller should return
+  immediately), `false` if the request is outside the canonical namespace or
+  is some other route within it (an API endpoint, an asset) that the caller
+  or HFS's own serving should handle instead.
 
 ## Compatibility promise
 

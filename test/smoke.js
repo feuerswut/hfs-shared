@@ -10,6 +10,10 @@ const version = require('../dist/lib/version')
 const auth = require('../dist/lib/auth')
 const response = require('../dist/lib/standard-response')
 const adminUi = require('../dist/lib/admin-ui')
+const { canonicalPath, servePublic } = require('../dist/lib/serve-public')
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
 
 function mockCtx() {
     const headers = {}
@@ -55,6 +59,92 @@ function mockCtx() {
     const merged = adminUi.buildSections({ a: 1 }, { header_t: adminUi.sectionHeader('T', 'D') }, { b: 2 })
     assert.deepStrictEqual(Object.keys(merged), ['a', 'header_t', 'b'])
     assert.strictEqual(merged.header_t.type, 'show_html')
+}
+
+// serve-public
+{
+    const distDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-shared-servepublic-'))
+    fs.mkdirSync(path.join(distDir, 'public'), { recursive: true })
+    fs.writeFileSync(path.join(distDir, 'public', 'index.html'), '<html>bundled</html>')
+    const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-shared-servepublic-storage-'))
+
+    const makeApi = username => ({
+        id: 'hfs-example', distDir, storageDir,
+        require: () => ({ getCurrentUsername: () => username }),
+    })
+    const makeCtx = (p, qs) => {
+        const headers = {}
+        return {
+            path: p, querystring: qs || '', status: 200, body: undefined, type: undefined,
+            set: (k, v) => { headers[k] = v }, stop() { this.stopped = true }, headers,
+        }
+    }
+
+    assert.strictEqual(canonicalPath(makeApi('alice')), '/~/plugins/hfs-example/')
+
+    // outside the namespace entirely: not handled
+    {
+        const ctx = makeCtx('/somewhere/else')
+        assert.strictEqual(servePublic(ctx, makeApi('alice'), { distDir }), false)
+    }
+
+    // bare path and /index.html both redirect to the trailing-slash root
+    for (const p of ['/~/plugins/hfs-example', '/~/plugins/hfs-example/index.html']) {
+        const ctx = makeCtx(p, 'x=1')
+        assert.strictEqual(servePublic(ctx, makeApi('alice'), { distDir }), true)
+        assert.strictEqual(ctx.status, 302)
+        assert.strictEqual(ctx.headers.Location, '/~/plugins/hfs-example/?x=1')
+    }
+
+    // unauthenticated: denied at the root
+    {
+        const ctx = makeCtx('/~/plugins/hfs-example/')
+        assert.strictEqual(servePublic(ctx, makeApi(null), { distDir }), true)
+        assert.strictEqual(ctx.status, 401)
+    }
+
+    // authenticated: serves the bundled index.html at the trailing-slash root
+    {
+        const ctx = makeCtx('/~/plugins/hfs-example/')
+        assert.strictEqual(servePublic(ctx, makeApi('alice'), { distDir }), true)
+        assert.strictEqual(ctx.body, '<html>bundled</html>')
+        assert.strictEqual(ctx.type, 'text/html; charset=utf-8')
+    }
+
+    // useCustomFrontend: an override file wins over the bundled one
+    {
+        fs.mkdirSync(path.join(storageDir, 'custom-frontend'), { recursive: true })
+        fs.writeFileSync(path.join(storageDir, 'custom-frontend', 'index.html'), '<html>custom</html>')
+        const ctx = makeCtx('/~/plugins/hfs-example/')
+        assert.strictEqual(servePublic(ctx, makeApi('alice'), { distDir, useCustomFrontend: true }), true)
+        assert.strictEqual(ctx.body, '<html>custom</html>')
+    }
+
+    // subPath: the dashboard can live under a sub-route instead of the root
+    {
+        const ctx = makeCtx('/~/plugins/hfs-example/admin')
+        assert.strictEqual(servePublic(ctx, makeApi('alice'), { distDir, subPath: 'admin' }), true)
+        assert.strictEqual(ctx.status, 302)
+        assert.strictEqual(ctx.headers.Location, '/~/plugins/hfs-example/admin/')
+    }
+
+    // pathAlias: an old URL 307-redirects to the canonical one, subpath+query kept
+    {
+        const ctx = makeCtx('/old/example/api/x', 'y=2')
+        assert.strictEqual(servePublic(ctx, makeApi('alice'), { distDir, pathAlias: '/old/example' }), true)
+        assert.strictEqual(ctx.status, 307)
+        assert.strictEqual(ctx.headers.Location, '/~/plugins/hfs-example/api/x?y=2')
+    }
+
+    // a path inside the namespace but not the dashboard entry point (e.g. an
+    // API route or an asset) is left for the caller / HFS to handle
+    {
+        const ctx = makeCtx('/~/plugins/hfs-example/api/data')
+        assert.strictEqual(servePublic(ctx, makeApi('alice'), { distDir }), false)
+    }
+
+    fs.rmSync(distDir, { recursive: true, force: true })
+    fs.rmSync(storageDir, { recursive: true, force: true })
 }
 
 // ip-parse
