@@ -19,15 +19,15 @@ const { createHttpAuthClient } = require('./lib/http-auth')
 const adminUi = require('./lib/admin-ui')
 const cfg = require('./lib/config-accessor')
 const response = require('./lib/standard-response')
+const { canonicalPath, servePublic } = require('./lib/serve-public')
 
 exports.description = "Shared library for HFS plugins: auth gating, batched logging and more."
-exports.version = 1.1
+exports.version = 1.2
 exports.apiRequired = 13
 exports.author = "feuerswut"
 exports.repo = "feuerswut/hfs-shared"
 exports.changelog = [
-    { version: 1.1, message: "http-auth: createHttpAuthClient gains optional userAgent/authScheme/headers (additive, backward-compatible)." },
-    { version: 1.0, message: "Initial release: auth, logger, ip-parse, http-auth, admin-ui, config-accessor, standard-response." },
+    { version: 1.2, message: "servePublic; auth.gate gains redirectUrl." },
 ]
 
 exports.customApi = {
@@ -41,6 +41,8 @@ exports.customApi = {
         adminUi,
         cfg,
         response,
+        canonicalPath,
+        servePublic,
     }),
 }
 
