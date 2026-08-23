@@ -221,7 +221,9 @@ assert.strictEqual(ipParse.isLocalIPv6(ipParse.ipv6ToBigInt('fe80::1')), true)
 assert.strictEqual(version.requireVersion('^1.0.0'), true)
 assert.throws(() => version.requireVersion('^2.0.0'))
 
-// logger: batches multiple log() calls into one flush
+// logger: batches multiple log() calls into one flush, one line per distinct
+// message shape (unrelated messages stay separate; near-duplicates that only
+// differ by an IP/number merge into a single summarized line).
 async function testLogger() {
     const lines = []
     const api = { log: (...args) => lines.push(args.join(' ')) }
@@ -229,7 +231,21 @@ async function testLogger() {
     logger.log('a')
     logger.log('b')
     await new Promise(resolve => setTimeout(resolve, 50))
-    assert.strictEqual(lines.length, 3) // header line + one line per event
+    assert.strictEqual(lines.length, 2, `expected one line per distinct message, got: ${lines.join(' | ')}`)
+
+    lines.length = 0
+    logger.log('blocked at socket: 1.2.3.4')
+    logger.log('blocked at socket: 1.2.3.4')
+    logger.log('blocked at socket: 5.6.7.8')
+    await new Promise(resolve => setTimeout(resolve, 50))
+    assert.strictEqual(lines.length, 1, `expected near-duplicates to merge into one line, got: ${lines.join(' | ')}`)
+    assert.ok(lines[0].includes('1.2.3.4') && lines[0].includes('5.6.7.8'), `expected both distinct IPs listed, got: ${lines[0]}`)
+
+    lines.length = 0
+    for (let i = 0; i < 7; i++) logger.log(`blocked at socket: 10.0.0.${i}`)
+    await new Promise(resolve => setTimeout(resolve, 50))
+    assert.strictEqual(lines.length, 1, `expected a large cluster to still collapse into one line, got: ${lines.join(' | ')}`)
+    assert.ok(lines[0].includes('7 events'), `expected a '7 events' summary once past the 5-value list cap, got: ${lines[0]}`)
 }
 
 testLogger().then(() => console.log('hfs-shared smoke tests passed'))

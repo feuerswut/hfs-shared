@@ -22,11 +22,12 @@ const response = require('./lib/standard-response')
 const { canonicalPath, servePublic } = require('./lib/serve-public')
 
 exports.description = "Shared library for HFS plugins: auth gating, batched logging and more."
-exports.version = 1.3
+exports.version = 1.4
 exports.apiRequired = 13
 exports.author = "feuerswut"
 exports.repo = "feuerswut/hfs-shared"
 exports.changelog = [
+    { version: 1.4, message: "createLogger's batch flush now clusters near-identical lines (e.g. an IP address being the only difference) into one summarized line instead of dumping every occurrence after a 'N events' header." },
     { version: 1.3, message: "servePublic logs and reports file-read failures instead of a silent 404." },
 ]
 
