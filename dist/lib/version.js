@@ -1,7 +1,7 @@
 // Semver-style compatibility check for customApi consumers.
 'use strict'
 
-const VERSION = '1.2.0'
+const VERSION = '1.3.0'
 
 function parseMajor(range) {
     if (typeof range === 'number') return range
