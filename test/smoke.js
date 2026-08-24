@@ -81,9 +81,11 @@ function mockCtx() {
     fs.writeFileSync(path.join(distDir, 'public', 'index.html'), '<html>bundled</html>')
     const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-shared-servepublic-storage-'))
 
+    const logs = []
     const makeApi = username => ({
         id: 'hfs-example', distDir, storageDir,
         require: () => ({ getCurrentUsername: () => username }),
+        log: (...args) => logs.push(args.join(' ')),
     })
     const makeCtx = (p, qs) => {
         const headers = {}
@@ -180,6 +182,17 @@ function mockCtx() {
         const ctx = makeCtx('/~/plugins/hfs-example/admin/')
         assert.strictEqual(servePublic(ctx, makeApi('alice'), { distDir, subPath: 'admin', indexFile: 'admin.html' }), true)
         assert.strictEqual(ctx.body, '<html>admin</html>')
+    }
+
+    // A missing/misnamed bundled file must never be a silent, undiagnosable
+    // 404 -- it logs the exact attempted path and puts it in the response too.
+    {
+        logs.length = 0
+        const ctx = makeCtx('/~/plugins/hfs-example/')
+        assert.strictEqual(servePublic(ctx, makeApi('alice'), { distDir, indexFile: 'does-not-exist.html' }), true)
+        assert.strictEqual(ctx.status, 404)
+        assert.ok(logs.some(l => l.includes('does-not-exist.html')), `expected a log line naming the missing file, got: ${JSON.stringify(logs)}`)
+        assert.ok(String(ctx.body).includes('does-not-exist.html'), `expected the response body to name the missing file, got: ${ctx.body}`)
     }
 
     fs.rmSync(distDir, { recursive: true, force: true })

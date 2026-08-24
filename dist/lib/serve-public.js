@@ -80,12 +80,21 @@ function servePublic(ctx, api, opts) {
         } catch {} // fall through to the bundled file
     }
 
+    const bundledFile = path.join(opts.distDir || '', 'public', indexFile)
     try {
         ctx.type = 'text/html; charset=utf-8'
         ctx.set('Cache-Control', 'no-cache')
-        ctx.body = fs.readFileSync(path.join(opts.distDir, 'public', indexFile), 'utf8')
-    } catch {
+        ctx.body = fs.readFileSync(bundledFile, 'utf8')
+    } catch (err) {
+        // Never silent: the request already cleared the auth gate above, so
+        // it's safe to say exactly which local path failed and why (missing
+        // file, wrong distDir, permissions, an unsupported indexFile against
+        // an older servePublic) instead of a bare, undiagnosable 404.
+        if (typeof api.log === 'function')
+            api.log(`[servePublic] failed to read ${bundledFile}: ${err && err.message}`)
         ctx.status = 404
+        ctx.type = 'text/plain'
+        ctx.body = `servePublic: could not read ${bundledFile} (${err && (err.code || err.message)})`
     }
     ctx.stop()
     return true

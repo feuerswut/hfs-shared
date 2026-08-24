@@ -22,12 +22,12 @@ const response = require('./lib/standard-response')
 const { canonicalPath, servePublic } = require('./lib/serve-public')
 
 exports.description = "Shared library for HFS plugins: auth gating, batched logging and more."
-exports.version = 1.2
+exports.version = 1.3
 exports.apiRequired = 13
 exports.author = "feuerswut"
 exports.repo = "feuerswut/hfs-shared"
 exports.changelog = [
-    { version: 1.2, message: "servePublic; auth.gate gains redirectUrl." },
+    { version: 1.3, message: "servePublic logs and reports file-read failures instead of a silent 404." },
 ]
 
 exports.customApi = {
