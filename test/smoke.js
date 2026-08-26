@@ -57,6 +57,23 @@ function mockCtx() {
     assert.deepStrictEqual(hidden, { denied: true, reason: 'hidden', silent: true })
     assert.strictEqual(ctx.status, 0)
     assert.strictEqual(ctx.stopped, false)
+
+    // failClosed: an empty/unconfigured allowlist denies everyone, even an
+    // anonymous request that would otherwise get a 401 further down.
+    ctx = mockCtx()
+    const deniedUnconfiguredAnon = auth.gate(ctx, apiFor(null), { failClosed: true })
+    assert.strictEqual(deniedUnconfiguredAnon.reason, 'unconfigured')
+    assert.strictEqual(ctx.status, 403)
+
+    // failClosed also denies an authenticated user when the list is still empty.
+    ctx = mockCtx()
+    const deniedUnconfiguredAuthed = auth.gate(ctx, apiFor('alice'), { failClosed: true })
+    assert.strictEqual(deniedUnconfiguredAuthed.reason, 'unconfigured')
+    assert.strictEqual(ctx.status, 403)
+
+    // failClosed with a configured, matching allowedUsers entry still allows through.
+    ctx = mockCtx()
+    assert.strictEqual(auth.gate(ctx, apiFor('alice'), { allowedUsers: [{ username: 'alice', enabled: true }], failClosed: true }), null)
 }
 
 // standard-response

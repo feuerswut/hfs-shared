@@ -18,7 +18,7 @@ function allowedUsersField(opts) {
     }
 }
 
-// gate(ctx, api, { allowedUsers, publicAccess, redirectUrl, hideFromUnauthorized }):
+// gate(ctx, api, { allowedUsers, publicAccess, redirectUrl, hideFromUnauthorized, failClosed }):
 // null if allowed, else { denied: true, reason } after sending a deny
 // response -- unless hideFromUnauthorized is set and the request is simply
 // unauthenticated, in which case nothing is written to ctx at all (the
@@ -36,16 +36,24 @@ function gate(ctx, api, opts) {
         return { denied: true, reason }
     }
 
+    const rows = Array.isArray(opts.allowedUsers) ? opts.allowedUsers : []
+    const allowed = rows
+        .map(r => (typeof r === 'string' ? r : (r && r.enabled !== false ? r.username : null)))
+        .filter(Boolean)
+
+    // opt-in: an empty/unconfigured allowlist normally means "any authenticated
+    // user" (see allowedUsersField's own helper text). A caller gating something
+    // sensitive (an admin route, a PII listing) can set failClosed to flip that
+    // default to "nobody at all", including anonymous requests, until at least
+    // one user is explicitly configured.
+    if (opts.failClosed && !allowed.length)
+        return deny(403, opts.failClosedMessage || 'Access denied: no allowed users are configured.', 'unconfigured')
+
     if (!username) {
         if (opts.publicAccess) return null
         if (opts.hideFromUnauthorized) return { denied: true, reason: 'hidden', silent: true }
         return deny(401, 'Authentication required', 'unauthenticated')
     }
-
-    const rows = Array.isArray(opts.allowedUsers) ? opts.allowedUsers : []
-    const allowed = rows
-        .map(r => (typeof r === 'string' ? r : (r && r.enabled !== false ? r.username : null)))
-        .filter(Boolean)
 
     if (allowed.length && !allowed.includes(username)) {
         const denied = deny(403, 'Access denied', 'not-allowed')

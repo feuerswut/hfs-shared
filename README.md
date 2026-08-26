@@ -24,10 +24,13 @@ filesystem-relative `require()`, no HFS core changes needed.
 
 ## Modules
 
-- **auth** -- `gate(ctx, api, { allowedUsers, publicAccess })` gates a
-  request to a configured allowlist of HFS accounts. `allowedUsersField()`
-  builds the config schema for that allowlist using HFS's native username
-  picker.
+- **auth** -- `gate(ctx, api, { allowedUsers, publicAccess, failClosed })` gates
+  a request to a configured allowlist of HFS accounts. By default an empty
+  `allowedUsers` means "any authenticated user"; set `failClosed: true` to
+  flip that to "nobody at all" (including anonymous requests) until at least
+  one user is configured -- for gating something sensitive like an admin
+  route or a PII listing. `allowedUsersField()` builds the config schema for
+  that allowlist using HFS's native username picker.
 - **createLogger** -- `createLogger(api, { tag, batchWindowMs, maxDelayMs })`
   batches log lines instead of one `api.log()` call per event, with a
   trailing-debounce flush capped at `maxDelayMs`.
