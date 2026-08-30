@@ -1,15 +1,4 @@
-// hfs-shared - shared library plugin for feuerswut's HFS plugins.
-//
-// Exposed via HFS's customApi mechanism (the same one hfs-tailwind uses to
-// share its browser.js with other plugins):
-//
-//   const shared = api.customApiCall('hfsShared')[0]
-//   shared.requireVersion('^1.0.0')
-//   const { auth, createLogger, ipParse, createHttpAuthClient, adminUi, cfg, response } = shared
-//
-// Compatibility promise: minor/patch releases never break this surface, only
-// a major version bump can. Call requireVersion() once at init() so an
-// incompatible pairing fails loudly instead of subtly.
+// hfs-shared - shared library plugin for HFS plugins.
 
 const version = require('./lib/version')
 const auth = require('./lib/auth')
@@ -20,14 +9,16 @@ const adminUi = require('./lib/admin-ui')
 const cfg = require('./lib/config-accessor')
 const response = require('./lib/standard-response')
 const { canonicalPath, servePublic } = require('./lib/serve-public')
+const { guardPlugin } = require('./lib/dependency-guard')
 
 exports.description = "Shared library for HFS plugins: auth gating, batched logging and more."
-exports.version = 1.5
+exports.version = 1.7
 exports.apiRequired = 13
 exports.author = "feuerswut"
 exports.repo = "feuerswut/hfs-shared"
+
 exports.changelog = [
-    { version: 1.5, message: "auth.gate() gained an opt-in failClosed flag: an empty/unconfigured allowedUsers list now denies everyone, including anonymous requests, instead of defaulting to 'any authenticated user' -- for callers gating sensitive routes." },
+    { version: 1.7, message: "dependencyGuard() now gives the specific reason (missing, stopped, uninstalled, version mismatch) instead of one generic message, and adds a 10s fallback poll alongside its event listeners so a missed event can't leave the warning stuck." },
     { version: 1.4, message: "createLogger's batch flush now clusters near-identical lines (e.g. an IP address being the only difference) into one summarized line instead of dumping every occurrence after a 'N events' header." },
     { version: 1.3, message: "servePublic logs and reports file-read failures instead of a silent 404." },
 ]
@@ -45,6 +36,7 @@ exports.customApi = {
         response,
         canonicalPath,
         servePublic,
+        dependencyGuard: guardPlugin,
     }),
 }
 
