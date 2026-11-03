@@ -1,0 +1,3 @@
+node_modules/
+# no dependencies, so an install only writes an empty lockfile
+package-lock.json
